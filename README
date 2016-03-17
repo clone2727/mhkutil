@@ -1,0 +1,7 @@
+README for mhkutil - A utility for dealing with Mohawk archives
+
+== Requirements ==
+ * Python 2.7
+ * PyPNG
+
+TODO: Write the rest
