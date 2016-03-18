@@ -81,3 +81,18 @@ def convertMohawkWave(archive, resType, resID, options):
 			# Bad
 			raise Exception('Unknown tWAV encoding {0}'.format(encoding))
 
+def convertMystSound(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	tag = stream.read(4)
+	if tag == 'RIFF':
+		# Raw wave
+		output = open('{0}_{1}.wav'.format(resType, resID), 'wb')
+		with output:
+			output.write(resource)
+	else:
+		# Has to be a Mohawk wave
+		convertMohawkWave(archive, resType, resID, options)
