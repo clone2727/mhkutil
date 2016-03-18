@@ -66,13 +66,13 @@ class Stream:
 		text = ''
 
 		while True:
-			text = self.readByte()
-			if text == 0:
+			char = self.readByte()
+			if char == 0:
 				break
 
-			string += chr(char)
+			text += chr(char)
 
-		return string
+		return text
 
 class FileStream(Stream):
 	def __init__(self, handle):
