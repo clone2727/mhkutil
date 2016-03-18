@@ -22,7 +22,7 @@ import optparse
 import sys
 
 from mhkarch import MohawkArchive
-from mhkbmp import convertMohawkBitmap
+from mhkbmp import convertMohawkBitmap, convertMystBitmap
 from mhksound import convertMohawkWave, convertMystSound
 
 def dumpResource(archive, resType, resID, fileName=None):
@@ -56,8 +56,10 @@ def dumpResource(archive, resType, resID, fileName=None):
 #   - (etc.)
 convertTypes = {
 	'MSND': convertMystSound,
+	'PICT': convertMystBitmap,
 	'tBMP': convertMohawkBitmap,
-	'tWAV': convertMohawkWave
+	'tWAV': convertMohawkWave,
+	'WDIB': convertMystBitmap
 }
 
 def listResources(archive, resType, resID):

@@ -298,3 +298,29 @@ def convertMohawkBitmap(archive, resType, resID, options):
 	with f:
 		writer = png.Writer(width, height, bitdepth=bitsPerPixel, palette=palette, compression=9)
 		writer.write(f, surface)
+
+def convertMystBitmap(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	# Attempt to detect if this is a PICT or compressed BMP
+	if stream.size() > (512 + 10 + 4):
+		stream.seek(512 + 10)
+		pictTag = stream.readUint32BE()
+		if pictTag == 0x001102FF:
+			# PICT image
+			raise Exception('TODO: Unhandled Myst PICT image')
+		else:
+			# BMP image
+			stream.seek(0)
+
+	# Decompress the BMP
+	uncompressedSize = stream.readUint32LE()
+	bmp = decompressLZ(stream, uncompressedSize)
+
+	# Write the BMP raw
+	output = open('{0}_{1}.bmp'.format(resType, resID), 'wb')
+	with output:
+		output.write(bmp)
