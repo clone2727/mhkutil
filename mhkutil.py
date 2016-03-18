@@ -23,6 +23,7 @@ import sys
 
 from mhkarch import MohawkArchive
 from mhkbmp import convertMohawkBitmap, convertMystBitmap
+from mhkmov import convertQuickTimeMovie
 from mhksound import convertMohawkWave, convertMystSound
 
 def dumpResource(archive, resType, resID, fileName=None):
@@ -52,12 +53,12 @@ def dumpResource(archive, resType, resID, fileName=None):
 #	- STRL
 #	- tBMH
 #	- tMID
-# 	- tMOV
 #   - (etc.)
 convertTypes = {
 	'MSND': convertMystSound,
 	'PICT': convertMystBitmap,
 	'tBMP': convertMohawkBitmap,
+	'tMOV': convertQuickTimeMovie,
 	'tWAV': convertMohawkWave,
 	'WDIB': convertMystBitmap
 }

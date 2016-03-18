@@ -74,6 +74,37 @@ class Stream:
 
 		return text
 
+class WriteStream:
+	def writeByte(self, x):
+		self.write(struct.pack('B', x))
+
+	def writeSByte(self, x):
+		self.write(struct.pack('b', x))
+
+	def writeUint16LE(self, x):
+		self.write(struct.pack('<H', x))
+
+	def writeSint16LE(self, x):
+		self.write(struct.pack('<h', x))
+
+	def writeUint16BE(self, x):
+		self.write(struct.pack('>H', x))
+
+	def writeSint16BE(self, x):
+		self.write(struct.pack('>h', x))
+
+	def writeUint32LE(self, x):
+		self.write(struct.pack('<L', x))
+
+	def writeSint32LE(self, x):
+		self.write(struct.pack('<l', x))
+
+	def writeUint32BE(self, x):
+		self.write(struct.pack('>L', x))
+
+	def writeSint32BE(self, x):
+		self.write(struct.pack('>l', x))
+
 class FileStream(Stream):
 	def __init__(self, handle):
 		self._handle = handle
@@ -92,6 +123,13 @@ class FileStream(Stream):
 
 	def read(self, size):
 		return bytearray(self._handle.read(size))
+
+class FileWriteStream(WriteStream):
+	def __init__(self, handle):
+		self._handle = handle
+
+	def write(self, x):
+		self._handle.write(x)
 
 class ByteStream(Stream):
 	def __init__(self, data):

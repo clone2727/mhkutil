@@ -164,3 +164,6 @@ class MohawkArchive:
 		self._stream.seek(resource.offset)
 		return self._stream.read(resource.size)
 
+	def getResourceOffset(self, type, id):
+		return self._typeMap[type][id].offset
+
