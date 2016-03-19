@@ -121,17 +121,28 @@ def convertMohawkMIDI(archive, resType, resID, options):
 	smfHeaderSize = stream.readUint32BE()
 	smfHeaderData = stream.read(smfHeaderSize)
 
-	# Next is the program number, likely patches
-	# Skip this, at least for now
-	prgTag = stream.read(4)
-	if prgTag != 'Prg#':
-		raise Exception('Failed to find the Prg# tag')
+	# Next, we need to parse through the file. MTrk are desired,
+	# Prg# need to be skipped
+	trackData = bytearray()
+	while stream.tell() < stream.size():
+		tag = stream.read(4)
+		size = stream.readUint32BE()
 
-	prgSize = stream.readUint32BE()
-	stream.seek(prgSize, os.SEEK_CUR)
+		if tag == 'Prg#':
+			# Skip the Prg# tag, at least for now
+			stream.seek(size, os.SEEK_CUR)
+		elif tag == 'MTrk':
+			# Append the track data
+			stream.seek(-8, os.SEEK_CUR)
+			trackData += stream.read(size + 8)
+		else:
+			# Unknown type!
+			raise Exception('Unknown Mohawk MIDI tag {0}'.format(tag))
 
-	# Next are the MIDI tracks. Read them verbatim.
-	trackData = stream.read(stream.size() - stream.tell())
+		# If the chunk is not aligned, skip a byte
+		# Mohawk MIDI needs to be aligned; SMF doesn't
+		if (size & 1) != 0:
+			stream.seek(1, os.SEEK_CUR)
 
 	output = open('{0}_{1}.mid'.format(resType, resID), 'wb')
 	with output:
@@ -140,3 +151,23 @@ def convertMohawkMIDI(archive, resType, resID, options):
 		outStream.writeUint32BE(smfHeaderSize)
 		outStream.write(smfHeaderData)
 		outStream.write(trackData)
+
+def convertMohawkSound(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	mhkTag = stream.read(4)
+	if mhkTag != 'MHWK':
+		raise Exception('Not a valid Mohawk sound resource')
+
+	stream.readUint32BE() # Skip size
+
+	mhkType = stream.read(4)
+	if mhkType == 'MIDI':
+		convertMohawkMIDI(archive, resType, resID, options)
+	elif mhkType == 'WAVE':
+		convertMohawkWave(archive, resType, resID, options)
+	else:
+		raise Exception('Unknown Mohawk sound type: {0}'.format(mhkType))
