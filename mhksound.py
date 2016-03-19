@@ -96,3 +96,47 @@ def convertMystSound(archive, resType, resID, options):
 	else:
 		# Has to be a Mohawk wave
 		convertMohawkWave(archive, resType, resID, options)
+
+def convertMohawkMIDI(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	mhkTag = stream.read(4)
+	if mhkTag != 'MHWK':
+		raise Exception('Not a valid Mohawk MIDI resource')
+
+	stream.readUint32BE() # Skip size
+
+	mhkType = stream.read(4)
+	if mhkType != 'MIDI':
+		raise Exception('Not a Mohawk MIDI resource')
+
+	# Next is the SMF header
+	smfHeaderTag = stream.read(4)
+	if smfHeaderTag != 'MThd':
+		raise Exception('Failed to find the MThd tag')
+
+	smfHeaderSize = stream.readUint32BE()
+	smfHeaderData = stream.read(smfHeaderSize)
+
+	# Next is the program number, likely patches
+	# Skip this, at least for now
+	prgTag = stream.read(4)
+	if prgTag != 'Prg#':
+		raise Exception('Failed to find the Prg# tag')
+
+	prgSize = stream.readUint32BE()
+	stream.seek(prgSize, os.SEEK_CUR)
+
+	# Next are the MIDI tracks. Read them verbatim.
+	trackData = stream.read(stream.size() - stream.tell())
+
+	output = open('{0}_{1}.mid'.format(resType, resID), 'wb')
+	with output:
+		outStream = FileWriteStream(output)
+		outStream.write('MThd')
+		outStream.writeUint32BE(smfHeaderSize)
+		outStream.write(smfHeaderData)
+		outStream.write(trackData)
