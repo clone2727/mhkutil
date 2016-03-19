@@ -138,7 +138,7 @@ class MohawkArchive:
 
 				resMap[resID] = Resource(offset, size, name)
 
-			typeMap[tagToString(tag)] = resMap
+			typeMap[tagToString(tag).lstrip('\0')] = resMap
 
 			# Seek to the next TypeTable entry
 			stream.seek(absOffset + (i + 1) * 8 + 4)
