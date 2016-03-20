@@ -56,6 +56,7 @@ def dumpResource(archive, resType, resID, fileName=None):
 #   - (etc.)
 convertTypes = {
 	'MSND': convertMystSound,
+	'MSNG': convertMohawkMIDI,
 	'PICT': convertMystBitmap,
 	 'SND': convertMohawkSound,
 	'STRL': convertStringList,
