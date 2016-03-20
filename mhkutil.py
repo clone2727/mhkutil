@@ -102,7 +102,7 @@ def hexDumpResource(archive, resType, resID):
 			if x % 4 == 3:
 				sys.stdout.write(' ')
 
-		sys.stdout.write(' |')
+		sys.stdout.write('|')
 
 		for x in range(16):
 			if offset + x < len(resource):
