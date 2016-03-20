@@ -121,7 +121,7 @@ class DrawType:
 	RLE8 = 1
 
 def drawRaw(stream, width, height, pitch, bitsPerPixel):
-	if bytesPerPixel not in (8, 24):
+	if bitsPerPixel not in (8, 24):
 		raise Exception('drawRaw only works on 8-bit and 24-bit images')
 
 	surface = []
@@ -183,6 +183,7 @@ def drawRLE8(stream, width, height, pitch, bitsPerPixel, isLE=False):
 
 # All drawing functions
 drawFuncs = {
+	DrawType.Raw: drawRaw,
 	DrawType.RLE8: drawRLE8
 }
 
@@ -200,7 +201,185 @@ def unpackLZ(stream):
 	return decompressLZ(stream, uncompressedSize)
 
 def unpackRiven(stream):
-	raise Exception('TODO: Unhandled Riven compression')
+	stream.readUint32BE() # Skip buffer size
+
+	output = bytearray()
+
+	subCommands = []
+
+	while stream.tell() < stream.size():
+		code = stream.readByte()
+
+		if code == 0x00:
+			# End of data
+			break
+		elif code in range(0x01, 0x40):
+			# Word Verbatim
+			output.extend(stream.read(code * 2))
+		elif code in range(0x40, 0x80):
+			# Word Repeat
+			data = output[-2:]
+
+			for i in range(code - 0x40):
+				output.extend(data)
+		elif code in range(0x80, 0xC0):
+			# Double Word Repeat
+			data = output[-4:]
+
+			for i in range(code - 0x80):
+				output.extend(data)
+		else:
+			# Specialized Commands
+			for i in range(code - 0xC0):
+				subCode = stream.readByte()
+
+				if subCode in range(0x01, 0x10):
+					output.append(output[-(subCode * 2)])
+					output.append(output[-(subCode * 2)])
+				elif subCode == 0x10:
+					output.append(output[-2])
+					output.append(stream.readByte())
+				elif subCode in range(0x11, 0x20):
+					output.append(output[-2])
+					output.append(output[-(subCode & 0x0F)])
+				elif subCode in range(0x20, 0x30):
+					output.append(output[-2])
+					output.append((output[-2] + (subCode & 0x0F)) & 0xFF)
+				elif subCode in range(0x30, 0x40):
+					output.append(output[-2])
+					output.append((output[-2] - (subCode & 0x0F)) & 0xFF)
+				elif subCode == 0x40:
+					output.append(stream.readByte())
+					output.append(output[-2])
+				elif subCode in range(0x41, 0x50):
+					output.append(output[-(subCode & 0x0F)])
+					output.append(output[-2])
+				elif subCode == 0x50:
+					output.extend(stream.read(2))
+				elif subCode in range(0x51, 0x58):
+					output.append(output[-(subCode & 0x07)])
+					output.append(stream.readByte())
+				elif subCode in range(0x59, 0x60):
+					output.append(stream.readByte())
+					output.append(output[-(subCode & 0x07)])
+				elif subCode in range(0x60, 0x70):
+					output.append(stream.readByte())
+					output.append((output[-2] + (subCode & 0x0F)) & 0xFF)
+				elif subCode in range(0x70, 0x80):
+					output.append(stream.readByte())
+					output.append((output[-2] - (subCode & 0x0F)) & 0xFF)
+				elif subCode in range(0x80, 0x90):
+					output.append((output[-2] + (subCode & 0x0F)) & 0xFF)
+					output.append(output[-2])
+				elif subCode in range(0x90, 0xA0):
+					output.append((output[-2] + (subCode & 0x0F)) & 0xFF)
+					output.append(stream.readByte())
+				elif subCode == 0xA0:
+					pattern = stream.readByte()
+					output.append((output[-2] + (pattern >> 4)) & 0xFF)
+					output.append((output[-2] + (pattern & 0x0F)) & 0xFF)
+				elif subCode in range(0xA4, 0xA8):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(3):
+						output.append(output[-distance])
+
+					output.append(stream.readByte())
+				elif subCode in range(0xA8, 0xAC):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(4):
+						output.append(output[-distance])
+				elif subCode in range(0xAC, 0xB0):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(5):
+						output.append(output[-distance])
+
+					output.append(stream.readByte())
+				elif subCode == 0xB0:
+					pattern = stream.readByte()
+					output.append((output[-2] + (pattern >> 4)) & 0xFF)
+					output.append((output[-2] - (pattern & 0x0F)) & 0xFF)
+				elif subCode in range(0xB4, 0xB8):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(6):
+						output.append(output[-distance])
+				elif subCode in range(0xB8, 0xBC):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(7):
+						output.append(output[-distance])
+
+					output.append(stream.readByte())
+				elif subCode in range(0xBC, 0xC0):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(8):
+						output.append(output[-distance])
+				elif subCode in range(0xC0, 0xD0):
+					output.append((output[-2] - (subCode & 0x0F)) & 0xFF)
+					output.append(output[-2])
+				elif subCode in range(0xD0, 0xE0):
+					output.append((output[-2] - (subCode & 0x0F)) & 0xFF)
+					output.append(stream.readByte())
+				elif subCode == 0xE0:
+					pattern = stream.readByte()
+					output.append((output[-2] - (pattern >> 4)) & 0xFF)
+					output.append((output[-2] + (pattern & 0x0F)) & 0xFF)
+				elif subCode in range(0xE4, 0xE8):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(9):
+						output.append(output[-distance])
+
+					output.append(stream.readByte())
+				elif subCode in range(0xE8, 0xEC):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(10):
+						output.append(output[-distance])
+				elif subCode in range(0xEC, 0xF0):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(11):
+						output.append(output[-distance])
+
+					output.append(stream.readByte())
+				elif subCode in (0xF0, 0xFF):
+					pattern = stream.readByte()
+					output.append((output[-2] - (pattern >> 4)) & 0xFF)
+					output.append((output[-2] - (pattern & 0x0F)) & 0xFF)
+				elif subCode in range(0xF4, 0xF8):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(12):
+						output.append(output[-distance])
+				elif subCode in range(0xF8, 0xFC):
+					distance = ((subCode & 0x03) << 8) | stream.readByte()
+
+					for j in range(13):
+						output.append(output[-distance])
+
+					output.append(stream.readByte())
+				elif subCode == 0xFC:
+					code1 = stream.readByte()
+					code2 = stream.readByte()
+					distance = ((code1 & 0x03) << 8) | code2
+					length = ((code1 >> 3) + 1) * 2 + 1
+
+					for j in range(length):
+						output.append(output[-distance])
+
+					if (code1 & (1 << 2)) == 0:
+						output.append(stream.readByte())
+					else:
+						output.append(output[-distance])
+				else:
+					raise Exception('Unknown Riven pack subcode 0x{0:02X}'.format(subCode))
+
+	return output
 
 # All unpackers
 unpackFuncs = {
