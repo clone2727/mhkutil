@@ -23,6 +23,7 @@ import sys
 
 from mhkarch import MohawkArchive
 from mhkbmp import convertMohawkBitmap, convertMystBitmap
+from mhkcursor import convertMacCursor
 from mhkmov import convertQuickTimeMovie
 from mhksound import convertMohawkWave, convertMohawkMIDI, convertMohawkSound, convertMystSound
 
@@ -58,6 +59,7 @@ convertTypes = {
 	'PICT': convertMystBitmap,
 	 'SND': convertMohawkSound,
 	'tBMP': convertMohawkBitmap,
+	'tCUR': convertMacCursor,
 	'tMID': convertMohawkMIDI,
 	'tMOV': convertQuickTimeMovie,
 	'tWAV': convertMohawkWave,
