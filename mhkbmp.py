@@ -475,7 +475,7 @@ def convertMohawkBitmap(archive, resType, resID, options):
 	# Write to a file
 	f = open('{0}_{1}.png'.format(resType, resID), 'wb')
 	with f:
-		writer = png.Writer(width, height, bitdepth=bitsPerPixel, palette=palette, compression=9)
+		writer = png.Writer(width, height, bitdepth=8, palette=palette, compression=9)
 		writer.write(f, surface)
 
 def convertMystBitmap(archive, resType, resID, options):
