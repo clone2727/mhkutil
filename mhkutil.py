@@ -85,7 +85,14 @@ def listResources(archive, resType, resID):
 				sys.exit(1)
 
 		for id in idList:
-			sys.stdout.write('{0} {1}\n'.format(type, id))
+			desc = '{0} {1}'.format(type, id)
+
+			# See if there's a name
+			name = archive.getName(type, id)
+			if name:
+				desc += ' - ' + name
+
+			sys.stdout.write('{0}\n'.format(desc))
 
 def hexDumpResource(archive, resType, resID):
 	try:

@@ -167,3 +167,6 @@ class MohawkArchive:
 	def getResourceOffset(self, type, id):
 		return self._typeMap[type][id].offset
 
+	def getName(self, type, id):
+		return self._typeMap[type][id].name
+
