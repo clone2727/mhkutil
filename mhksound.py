@@ -20,7 +20,106 @@
 from stream import *
 import os
 import sys
-import wave
+
+def decodeRaw(stream, bitsPerSample):
+	if bitsPerSample not in (8, 16):
+		raise Exception('Invalid bits per sample: {0}'.format(bitsPerSample))
+
+	samples = []
+
+	while stream.tell() < stream.size():
+		if bitsPerSample == 8:
+			samples.append(stream.readByte())
+		else:
+			samples.append(stream.readSint16LE())
+
+	return samples
+
+class ADPCMDecodeState:
+	def __init__(self):
+		self.last = 0
+		self.stepIndex = 0
+
+imaIndexTable = [
+	-1, -1, -1, -1, 2, 4, 6, 8,
+	-1, -1, -1, -1, 2, 4, 6, 8
+]
+
+imaStepTable = [
+	7, 8, 9, 10, 11, 12, 13, 14, 16, 17,
+	19, 21, 23, 25, 28, 31, 34, 37, 41, 45,
+	50, 55, 60, 66, 73, 80, 88, 97, 107, 118,
+	130, 143, 157, 173, 190, 209, 230, 253, 279, 307,
+	337, 371, 408, 449, 494, 544, 598, 658, 724, 796,
+	876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066,
+	2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358,
+	5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899,
+	15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767
+]
+
+def decodeIMASample(data, state):
+	# Decode based on the current step
+	diff = (2 * (data & 0x07) + 1) * imaStepTable[state.stepIndex] // 8
+
+	# For the high bit, negate the sample
+	if (data & 0x08) != 0:
+		diff *= -1
+
+	# Apply the diff to the last sample, clipping it to 16-bit signed
+	sample = max(-32768, min(state.last + diff, 32767))
+
+	# Update the state
+	state.last = sample
+	state.stepIndex = max(0, min(state.stepIndex + imaIndexTable[data], len(imaStepTable) - 1))
+
+	return sample
+
+def decodeADPCM(stream, channels):
+	if channels not in (1, 2):
+		raise Exception('Invalid channel count: {0}'.format(channels))
+
+	samples = []
+	state = [ADPCMDecodeState(), ADPCMDecodeState()]
+
+	while stream.tell() < stream.size():
+		data = stream.readByte()
+		samples.append(decodeIMASample((data >> 4) & 0x0F, state[0]))
+		samples.append(decodeIMASample(data & 0x0F, state[0 if channels == 1 else 1]))
+
+	return samples
+
+def writeWave(output, samples, channels, bitsPerSample, sampleRate):
+	if bitsPerSample not in (8, 16):
+		raise Exception('Unhandled wave bits per sample: {0}'.format(bitsPerSample))
+
+	# Calculate the data size
+	dataSize = len(samples) * bitsPerSample / 8
+
+	# Write the RIFF header
+	output.write('RIFF')
+	output.writeUint32LE(4 + (8 + 16) + (8 + dataSize)) # RIFF size
+	output.write('WAVE')
+
+	# Write the fmt header
+	output.write('fmt ')
+	output.writeUint32LE(16) # fmt size
+	output.writeUint16LE(1) # 1 = PCM
+	output.writeUint16LE(channels)
+	output.writeUint32LE(sampleRate)
+	output.writeUint32LE(sampleRate * channels * bitsPerSample / 8) # Byte rate
+	output.writeUint16LE(channels * bitsPerSample / 8) # Block align
+	output.writeUint16LE(bitsPerSample)
+
+	# Write the data chunk
+	output.write('data')
+	output.writeUint32LE(len(samples) * bitsPerSample / 8) # data size
+
+	# Encode all the samples
+	for sample in samples:
+		if bitsPerSample == 8:
+			output.writeByte(sample)
+		else:
+			output.writeSint16LE(sample)
 
 def convertMohawkWave(archive, resType, resID, options):
 	# Get the resource from the file
@@ -55,28 +154,30 @@ def convertMohawkWave(archive, resType, resID, options):
 		stream.readUint16BE() # loop count
 		stream.readUint32BE() # loop start
 		stream.readUint32BE() # loop end
-		audioData = stream.read(size - 20)
+		audioData = ByteStream(stream.read(size - 20))
 
 		if encoding == 0:
 			# PCM
-			output = open('{0}_{1}.wav'.format(resType, resID), 'wb')
+			samples = decodeRaw(audioData, bitsPerSample)
 
+			output = open('{0}_{1}.wav'.format(resType, resID), 'wb')
 			with output:
-				waveout = wave.open(output, 'wb')
-				waveout.setnchannels(channels)
-				waveout.setsampwidth(bitsPerSample / 8)
-				waveout.setframerate(sampleRate)
-				waveout.writeframes(audioData)
-				waveout.close()
+				outStream = FileWriteStream(output)
+				writeWave(outStream, samples, channels, bitsPerSample, sampleRate)
 		elif encoding == 1:
 			# ADPCM
-			raise Exception('TODO: ADPCM audio')
+			samples = decodeADPCM(audioData, channels)
+
+			output = open('{0}_{1}.wav'.format(resType, resID), 'wb')
+			with output:
+				outStream = FileWriteStream(output)
+				writeWave(outStream, samples, channels, 16, sampleRate)
 		elif encoding == 2:
 			# MPEG Layer II
 			output = open('{0}_{1}.mp3'.format(resType, resID), 'wb')
 
 			with output:
-				output.write(resource)
+				output.write(audioData.read(audioData.size()))
 		else:
 			# Bad
 			raise Exception('Unknown tWAV encoding {0}'.format(encoding))
