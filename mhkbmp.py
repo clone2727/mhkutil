@@ -18,6 +18,7 @@
 # along with mhkutil. If not, see <http://www.gnu.org/licenses/>.
 
 from stream import *
+from mhkarch import MohawkArchive
 import os
 import png
 
@@ -413,12 +414,7 @@ def decodePalette(stream):
 
 	return palette
 
-def convertMohawkBitmap(archive, resType, resID, options):
-	# Get the resource from the file
-	resource = archive.getResource(resType, resID)
-
-	stream = ByteStream(resource)
-
+def decodeImage(stream, archive, resType, resID, options):
 	width = stream.readUint16BE() & 0x3FFF
 	height = stream.readUint16BE() & 0x3FFF
 	pitch = stream.readUint16BE() & 0x3FFE
@@ -451,8 +447,15 @@ def convertMohawkBitmap(archive, resType, resID, options):
 		if paletteID is None:
 			raise Exception('{0} {1} has no palette; please specify one'.format(resType, resID))
 
+		# See if the palette file override is set
+		paletteFile = options['paletteFile']
+		if paletteFile is None:
+			palArchive = archive
+		else:
+			palArchive = MohawkArchive(paletteFile)
+
 		# Decode the palette
-		palette = decodePalette(ByteStream(archive.getResource('tPAL', paletteID)))
+		palette = decodePalette(ByteStream(palArchive.getResource('tPAL', paletteID)))
 
 	# Figure out the unpacker
 	try:
@@ -470,13 +473,70 @@ def convertMohawkBitmap(archive, resType, resID, options):
 		raise Exception('Unknown draw type {0}'.format(drawType))
 
 	# Draw the image to a surface
-	surface = drawFunc(stream, width, height, pitch, bitsPerPixel)
+	return width, height, palette, drawFunc(stream, width, height, pitch, bitsPerPixel)
+
+def convertMohawkBitmap(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	# Decode the image
+	width, height, palette, surface = decodeImage(stream, archive, resType, resID, options)
 
 	# Write to a file
 	f = open('{0}_{1}.png'.format(resType, resID), 'wb')
 	with f:
 		writer = png.Writer(width, height, bitdepth=8, palette=palette, compression=9)
 		writer.write(f, surface)
+
+def convertMohawkBitmapSet(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	imageCount = stream.readUint16BE() & 0x3FFF
+	stream.seek(4, os.SEEK_CUR)
+	format = stream.readUint16BE()
+
+	packType = (format & 0x0F00) >> 8
+
+	# Figure out the unpacker
+	try:
+		unpackFunc = unpackFuncs[packType]
+	except KeyError:
+		raise Exception('Unknown pack type {0}'.format(packType))
+
+	# Decode the offsets
+	stream = ByteStream(unpackFunc(stream))
+	offsets = [stream.readUint32BE() - 8 for i in range(imageCount)]
+
+	# Decode all the surfaces
+	surfaces = []
+	for i in range(imageCount):
+		stream.seek(offsets[i])
+
+		# Calculate the length of the subimage
+		if i == imageCount - 1:
+			length = stream.size() - offsets[i]
+		else:
+			length = offsets[i + 1] - offsets[i]
+
+		# Read in the subimage
+		subStream = ByteStream(stream.read(length))
+
+		# Decode that image
+		surfaces.append(decodeImage(subStream, archive, resType, resID, options))
+
+	# Write the images to files
+	for i in range(imageCount):
+		width, height, palette, surface = surfaces[i]
+
+		f = open('{0}_{1}_{2}.png'.format(resType, resID, i), 'wb')
+		with f:
+			writer = png.Writer(width, height, bitdepth=8, palette=palette, compression=9)
+			writer.write(f, surface)
 
 def convertMystBitmap(archive, resType, resID, options):
 	# Get the resource from the file

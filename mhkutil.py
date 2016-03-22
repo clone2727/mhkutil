@@ -22,7 +22,7 @@ import optparse
 import sys
 
 from mhkarch import MohawkArchive
-from mhkbmp import convertMohawkBitmap, convertMystBitmap
+from mhkbmp import convertMohawkBitmap, convertMystBitmap, convertMohawkBitmapSet
 from mhkcursor import convertMacCursor
 from mhkmov import convertQuickTimeMovie
 from mhkriven import convertRivenNames
@@ -52,9 +52,7 @@ def dumpResource(archive, resType, resID, fileName=None):
 		sys.stderr.write('Failed to write the resource: {0}\n'.format(ex))
 		sys.exit(1)
 
-# TODO: Other types:
-#	- tBMH
-#   - (etc.)
+# TODO: Other types
 convertTypes = {
 	'MSND': convertMystSound,
 	'MSNG': convertMohawkMIDI,
@@ -62,6 +60,7 @@ convertTypes = {
 	'PICT': convertMystBitmap,
 	 'SND': convertMohawkSound,
 	'STRL': convertStringList,
+	'tBMH': convertMohawkBitmapSet,
 	'tBMP': convertMohawkBitmap,
 	'tCUR': convertMacCursor,
 	'tMID': convertMohawkMIDI,
@@ -158,6 +157,10 @@ def main():
 				      help='The palette ID to use if no palette is present ' +
 					       'in the converted image',
 					  metavar='ID', type='int')
+	parser.add_option('--palette-file', dest='paletteFile',
+	                  help='The archive from which to retrieve the palette. ' +
+	                       'The main archive is used if not specified.',
+	                  metavar='FILE')
 	options, args = parser.parse_args()
 
 	if len(args) < 1:
