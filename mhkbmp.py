@@ -426,6 +426,22 @@ def findPalette(archive, resID):
 	else:
 		raise Exception('Failed to find palette with ID {0}'.format(resID))
 
+def isValidOffsetSet(offsets, streamSize):
+	# The offset needs to be after the set of the offsets
+	minOffset = len(offsets) * 4 + 8
+
+	# The first offset must be the minimum
+	if offsets[0] != minOffset:
+		return False
+
+	# All the offsets should be in the stream
+	for offset in offsets:
+		if offset < minOffset or offset >= streamSize:
+			return False
+
+	# The offsets should be in ascending order
+	return sorted(offsets) == offsets
+
 def decodeImage(stream, archive, resType, resID, options):
 	width = stream.readUint16BE() & 0x3FFF
 	height = stream.readUint16BE() & 0x3FFF
@@ -478,6 +494,18 @@ def decodeImage(stream, archive, resType, resID, options):
 	# Decode the stream
 	stream = ByteStream(unpackFunc(stream))
 
+	# Attempt to detect if this is really a set of images
+	if packType != PackType.Riven and drawType == DrawType.Raw and stream.size() > width * 4:
+		offsets = [stream.readUint32BE() for i in range(width)]
+
+		# Return a set of None
+		if isValidOffsetSet(offsets, stream.size()):
+			convertMohawkBitmapSet(archive, resType, resID, options)
+			return None, None, None, None
+
+		# Seek back and continue decompression
+		stream.seek(0)
+
 	# Figure out the drawing function
 	try:
 		drawFunc = drawFuncs[drawType]
@@ -495,6 +523,10 @@ def convertMohawkBitmap(archive, resType, resID, options):
 
 	# Decode the image
 	width, height, palette, surface = decodeImage(stream, archive, resType, resID, options)
+
+	# Bail if the surface is None
+	if surface is None:
+		return
 
 	# Write to a file
 	f = open('{0}_{1}.png'.format(resType, resID), 'wb')
