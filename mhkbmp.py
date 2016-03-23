@@ -414,6 +414,18 @@ def decodePalette(stream):
 
 	return palette
 
+def findPalette(archive, resID):
+	if archive.hasResource('tPAL', resID):
+		# Most games just use tPAL, because they're sane
+		return decodePalette(ByteStream(archive.getResource('tPAL', resID)))
+	elif archive.hasResource('SHPL', resID):
+		# Zoombinis stores its palettes in the beginning of the SHPL
+		stream = ByteStream(archive.getResource('SHPL', resID))
+		stream.seek(4) # Skip the header
+		return decodePalette(stream)
+	else:
+		raise Exception('Failed to find palette with ID {0}'.format(resID))
+
 def decodeImage(stream, archive, resType, resID, options):
 	width = stream.readUint16BE() & 0x3FFF
 	height = stream.readUint16BE() & 0x3FFF
@@ -455,7 +467,7 @@ def decodeImage(stream, archive, resType, resID, options):
 			palArchive = MohawkArchive(paletteFile)
 
 		# Decode the palette
-		palette = decodePalette(ByteStream(palArchive.getResource('tPAL', paletteID)))
+		palette = findPalette(palArchive, paletteID)
 
 	# Figure out the unpacker
 	try:
