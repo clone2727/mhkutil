@@ -209,3 +209,58 @@ def convertRivenCard(archive, resType, resID, options):
 	output = open('{0}_{1}.txt'.format(resType, resID), 'wb')
 	with output:
 		output.write(text)
+
+def convertRivenHotspots(archive, resType, resID, options):
+	# Get the resource from the file
+	resource = archive.getResource(resType, resID)
+
+	stream = ByteStream(resource)
+
+	# Get the external command and variable name lists
+	hotspotNames = parseRivenNameList(ByteStream(archive.getResource('NAME', 2)))
+	externalCommandNames = parseRivenNameList(ByteStream(archive.getResource('NAME', 3)))
+	variableNames = parseRivenNameList(ByteStream(archive.getResource('NAME', 4)))
+	stackNames = parseRivenNameList(ByteStream(archive.getResource('NAME', 5)))
+
+	# Parse the hotspots
+	hotspotCount = stream.readUint16BE()
+	text = ''
+
+	for i in range(hotspotCount):
+		blstID = stream.readUint16BE()
+		nameID = stream.readUint16BE()
+		left = stream.readSint16BE()
+		top = stream.readSint16BE()
+		right = stream.readSint16BE()
+		bottom = stream.readSint16BE()
+		u0 = stream.readUint16BE()
+		cursor = stream.readUint16BE()
+		index = stream.readUint16BE()
+		u1 = stream.readUint16BE()
+		zipModeHotspot = stream.readUint16BE()
+
+		# See if we actually have a name
+		if nameID == 0xFFFF:
+			nameText = '<No Card Name>'
+		else:
+			nameText = hotspotNames[nameID]
+
+		# Add a nice header
+		text += 'Hotspot {0}: {1}\n'.format(index, nameText)
+		text += '\tRect: {0}, {1}, {2}, {3}\n'.format(left, top, right, bottom)
+		text += '\tCursor: {0}\n'.format(cursor)
+		text += '\tIs Zip Mode Hotspot? {0}\n'.format('Yes' if zipModeHotspot else 'No')
+		text += '\tBLST ID: {0}\n\n'.format(blstID)
+
+		# Now actually add the script
+		text += decodeRivenScript(stream, externalCommandNames, variableNames, stackNames, 1)
+		text += '\n'
+
+	# Have some canned text for a hotspot-less card
+	if not text:
+		text = 'No Hotspots!\n'
+
+	# Write to a file
+	output = open('{0}_{1}.txt'.format(resType, resID), 'wb')
+	with output:
+		output.write(text)
