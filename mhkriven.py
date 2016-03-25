@@ -28,9 +28,11 @@ def parseRivenNameList(stream):
 	strings = []
 
 	# Read each of the strings
+	# Strip 0xBD characters. No idea what they are. Having either the 1/2
+	# character (CP-1252) or the omega symbol (MacRoman) makes no sense.
 	for offset in stringOffsets:
 		stream.seek(offset + nameCount * 4 + 2)
-		strings.append(stream.readCString())
+		strings.append(stream.readCString().strip('\xBD'))
 
 	return strings
 
