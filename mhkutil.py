@@ -25,7 +25,7 @@ from mhkarch import MohawkArchive
 from mhkbmp import convertMohawkBitmap, convertMystBitmap, convertMohawkBitmapSet
 from mhkcursor import convertMacCursor
 from mhkmov import convertQuickTimeMovie
-from mhkriven import convertRivenNames
+from mhkriven import convertRivenCard, convertRivenNames
 from mhksound import convertMohawkWave, convertMohawkMIDI, convertMohawkSound, convertMystSound
 from mhktext import convertStringList
 
@@ -54,6 +54,7 @@ def dumpResource(archive, resType, resID, fileName=None):
 
 # TODO: Other types
 convertTypes = {
+	'CARD': convertRivenCard,
 	'MSND': convertMystSound,
 	'MSNG': convertMohawkMIDI,
 	'NAME': convertRivenNames,
